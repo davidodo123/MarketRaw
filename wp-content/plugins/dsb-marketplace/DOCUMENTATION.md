@@ -521,3 +521,72 @@ wp --path=$WEBROOT rewrite flush
 echo "Deploy completado."
 ```
 
+
+### Dashboard (`vendor-dashboard.js`)
+
+Arquitectura tab-based:
+- Tab activo persiste en memoria de sesión (no en URL, por simplicidad)
+- Al entrar en tab Productos: carga lista AJAX automáticamente
+- Formulario inline (no modal) con `slideDown/Up` jQuery
+- Edición: extrae datos mínimos de la fila de tabla; los campos avanzados (descripción, categoría) se rellenan vacíos — intencional para Fase 2, datos completos en Fase 5
+
+### Rewrite rules (`/tienda/{slug}/`)
+
+```php
+add_rewrite_rule('^tienda/([^/]+)/?$', 'index.php?dsb_vendor_slug=$matches[1]', 'top');
+```
+
+Registrada en `init` (siempre) y en `activate()` (antes del flush). El filtro `template_include` devuelve `public/views/vendor-store.php` si el query var existe. El template llama a `get_header()` y `get_footer()` del tema activo.
+
+---
+
+## 6. Fase 3
+
+### Clase `Order` — split automático
+
+El hook principal:
+
+```php
+add_action('woocommerce_order_status_changed', [$this, 'on_status_changed'], 10, 4);
+```
+
+Se activa cuando un pedido pasa a `completed`. El método `split_order()`:
+
+1. **Idempotencia:** verifica que `wc_order_id` no exista ya en `dsb_vendor_orders`. Si existe, sale sin hacer nada.
+2. Itera `$order->get_items()` agrupando subtotales por `post_author` del producto.
+3. Para cada vendedor: calcula comisión, inserta `dsb_vendor_orders`, actualiza `balance`, inserta `dsb_transactions`, envía email.
+
+Si el pedido pasa a `refunded` o `cancelled`: `reverse_order()` hace el proceso inverso — descuenta balance, inserta transacción de tipo `refund` con monto negativo.
+
+### Clase `Commission` — cálculo
+
+```php
+calculate(float $subtotal, float $rate, ?object $vendor = null): [commission, vendor_earnings]
+```
+
+**Primer mes gratis:** si `$vendor->created_at` es < 30 días, `rate = 0.0`. Implementado como feature de onboarding sin intervención del admin.
+
+```php
+$commission      = round($subtotal * $rate / 100, 2);
+$vendor_earnings = round($subtotal - $commission, 2);
+```
+
+Se usa `round(..., 2)` — nunca `floor` o `ceil` para no perjudicar sistemáticamente a un lado.
+
+### Clase `Notification`
+
+#### Emails inmediatos
+
+- `vendor_new_order()` — al completar pedido. Enviado dentro del mismo request HTTP (síncrono, via `wp_mail`).
+- `vendor_approved()` — cuando admin aprueba la tienda. Llamado desde `Vendor::update_vendor_status()`.
+
+#### Crons registrados en activación
+
+| Cron hook | Frecuencia | Hora | Función |
+|-----------|-----------|------|---------|
+| `dsb_daily_summary` | `daily` | 08:00 del día siguiente | Resumen de ventas del día a cada vendedor con pedidos |
+| `dsb_weekly_low_stock` | `weekly` | Lunes 09:00 | Aviso a vendedores con productos con stock < 5 |
+
+Los crons solo envían email si hay datos relevantes (no molestan con emails vacíos).
+
+---
