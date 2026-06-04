@@ -20,27 +20,3 @@ class Core {
         }
         return self::$instance;
     }
-
-    private function init_components(): void {
-        new Product();
-        new Vendor();
-        new Ajax();
-        new Order();
-        new Notification();
-        new REST_API();
-
-        if ( is_admin() ) {
-            new Admin();
-        }
-
-        new Frontend();
-    }
-
-    public function load_textdomain(): void {
-        load_plugin_textdomain(
-            'dsb-marketplace',
-            false,
-            dirname( DSB_MARKETPLACE_BASENAME ) . '/languages/'
-        );
-    }
-}
