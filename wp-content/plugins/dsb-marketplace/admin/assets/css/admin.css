@@ -1,0 +1,45 @@
+/* DSB Marketplace — Admin */
+
+.dsb-admin-dashboard h1 { margin-bottom: 24px; }
+
+.dsb-admin-cards { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.dsb-admin-card {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px 24px;
+	min-width: 180px;
+	box-shadow: 0 1px 1px rgba( 0, 0, 0, .04 );
+}
+.dsb-admin-card h3 { margin: 0 0 8px; font-size: .9em; color: #646970; text-transform: uppercase; letter-spacing: .04em; }
+.dsb-admin-card__count { display: block; font-size: 2.4em; font-weight: 700; line-height: 1; margin-bottom: 8px; }
+.dsb-admin-card a { font-size: .85em; }
+
+/* Status badges */
+.dsb-status { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: .82em; font-weight: 600; }
+.dsb-status--pending   { background: #fef3c7; color: #92400e; }
+.dsb-status--active    { background: #d1fae5; color: #065f46; }
+.dsb-status--suspended { background: #fee2e2; color: #991b1b; }
+
+.dsb-vendors-table .dsb-vendor-actions { white-space: nowrap; }
+
+/* Product gallery */
+.dsb-gallery-meta { padding: 8px 0; }
+.dsb-gallery-preview { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; min-height: 40px; }
+.dsb-gallery-preview__item { position: relative; display: inline-block; }
+.dsb-gallery-preview__item img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+.dsb-gallery-remove {
+	position: absolute;
+	top: -6px; right: -6px;
+	width: 18px; height: 18px;
+	background: #dc2626;
+	color: #fff;
+	border: none;
+	border-radius: 50%;
+	font-size: 12px;
+	line-height: 18px;
+	text-align: center;
+	cursor: pointer;
+	padding: 0;
+}
+.dsb-gallery-remove:hover { background: #b91c1c; }
