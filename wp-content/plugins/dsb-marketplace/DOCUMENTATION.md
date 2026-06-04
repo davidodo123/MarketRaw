@@ -259,3 +259,265 @@ Todos los params pasan por `$wpdb->prepare()`. La query COUNT se ejecuta separad
 - Render HTML en cliente (no templates PHP)
 - Escaping manual (`escHtml`, `escAttr`) para prevenir XSS en datos dinámicos
 - `window.dsbSearchVendor(uid)` — API pública para filtrar por vendedor desde la store page
+
+### Dashboard (`vendor-dashboard.js`)
+
+Arquitectura tab-based:
+- Tab activo persiste en memoria de sesión (no en URL, por simplicidad)
+- Al entrar en tab Productos: carga lista AJAX automáticamente
+- Formulario inline (no modal) con `slideDown/Up` jQuery
+- Edición: extrae datos mínimos de la fila de tabla; los campos avanzados (descripción, categoría) se rellenan vacíos — intencional para Fase 2, datos completos en Fase 5
+
+### Rewrite rules (`/tienda/{slug}/`)
+
+```php
+add_rewrite_rule('^tienda/([^/]+)/?$', 'index.php?dsb_vendor_slug=$matches[1]', 'top');
+```
+
+Registrada en `init` (siempre) y en `activate()` (antes del flush). El filtro `template_include` devuelve `public/views/vendor-store.php` si el query var existe. El template llama a `get_header()` y `get_footer()` del tema activo.
+
+---
+
+## 6. Fase 3
+
+### Clase `Order` — split automático
+
+El hook principal:
+
+```php
+add_action('woocommerce_order_status_changed', [$this, 'on_status_changed'], 10, 4);
+```
+
+Se activa cuando un pedido pasa a `completed`. El método `split_order()`:
+
+1. **Idempotencia:** verifica que `wc_order_id` no exista ya en `dsb_vendor_orders`. Si existe, sale sin hacer nada.
+2. Itera `$order->get_items()` agrupando subtotales por `post_author` del producto.
+3. Para cada vendedor: calcula comisión, inserta `dsb_vendor_orders`, actualiza `balance`, inserta `dsb_transactions`, envía email.
+
+Si el pedido pasa a `refunded` o `cancelled`: `reverse_order()` hace el proceso inverso — descuenta balance, inserta transacción de tipo `refund` con monto negativo.
+
+### Clase `Commission` — cálculo
+
+```php
+calculate(float $subtotal, float $rate, ?object $vendor = null): [commission, vendor_earnings]
+```
+
+**Primer mes gratis:** si `$vendor->created_at` es < 30 días, `rate = 0.0`. Implementado como feature de onboarding sin intervención del admin.
+
+```php
+$commission      = round($subtotal * $rate / 100, 2);
+$vendor_earnings = round($subtotal - $commission, 2);
+```
+
+Se usa `round(..., 2)` — nunca `floor` o `ceil` para no perjudicar sistemáticamente a un lado.
+
+### Clase `Notification`
+
+#### Emails inmediatos
+
+- `vendor_new_order()` — al completar pedido. Enviado dentro del mismo request HTTP (síncrono, via `wp_mail`).
+- `vendor_approved()` — cuando admin aprueba la tienda. Llamado desde `Vendor::update_vendor_status()`.
+
+#### Crons registrados en activación
+
+| Cron hook | Frecuencia | Hora | Función |
+|-----------|-----------|------|---------|
+| `dsb_daily_summary` | `daily` | 08:00 del día siguiente | Resumen de ventas del día a cada vendedor con pedidos |
+| `dsb_weekly_low_stock` | `weekly` | Lunes 09:00 | Aviso a vendedores con productos con stock < 5 |
+
+Los crons solo envían email si hay datos relevantes (no molestan con emails vacíos).
+
+---
+
+## 7. Fase 4
+
+### REST API — Namespace `dsb/v1`
+
+Implementada en `REST_API::register_routes()` via `rest_api_init`. Todos los endpoints públicos usan `'permission_callback' => '__return_true'`. El único endpoint autenticado es `POST /vendors/{id}/reviews`.
+
+**Autenticación:** WP Application Passwords (nativo desde WP 5.6). Header: `Authorization: Basic base64(user:app_password)`.
+
+### Formato de respuesta consistente
+
+**Colecciones:**
+```json
+{
+  "data": [...],
+  "meta": {
+    "total": 47,
+    "pages": 4,
+    "page": 1,
+    "per_page": 12
+  }
+}
+```
+
+**Recursos individuales:**
+```json
+{
+  "data": { ... }
+}
+```
+
+**Errores:** `WP_Error` con código HTTP correcto (400, 401, 403, 404, 409, 500).
+
+### Consideraciones de los endpoints
+
+**`GET /search?q=`:** busca simultáneamente en productos (WP_Query con `s`) y en tiendas (`$wpdb` LIKE). El param `type` permite filtrar solo uno. Pensado para el chatbot IA de Fase 5.
+
+**`POST /vendors/{id}/reviews`:** valida que el `wc_order_id` pertenezca al usuario autenticado (si WooCommerce está disponible). La constraint UNIQUE en BD previene duplicados aunque el check falle.
+
+**`GET /products`:** usa `WP_Query` en lugar de `$wpdb` raw porque necesita compatibilidad con plugins de cache, filtros de terceros, y el sistema de paginación de WP. La búsqueda AJAX del frontend usa `$wpdb` raw por performance; la API REST prioriza compatibilidad.
+
+---
+
+## 8. Tema MarketRaw
+
+El tema `marketraw` es un tema custom minimalista que sirve como frontend del marketplace. **No es un tema de uso general** — está diseñado específicamente para el plugin.
+
+### Design System
+
+Variables CSS en `:root`:
+- Colores base: `--bg`, `--surface`, `--surface-2`, `--surface-3`
+- Accentos: `--purple` (#7C3AED), `--orange` (#F97316), `--cyan`, `--green`, `--pink`
+- Gradiente principal: `--grad-text` (purple → pink → orange)
+- Sombras: `--shadow-sm`, `--shadow`, `--shadow-md`, `--shadow-lg`
+
+### Animaciones JS (`main.js`)
+
+| Feature | Descripción |
+|---------|-------------|
+| Scroll progress bar | Barra de progreso en el top, actualizada en scroll |
+| Nav glassmorphism | Blur + border aparece al pasar 50px de scroll |
+| Mobile nav | Hamburger con animación de líneas, overlay con `body.overflow:hidden` |
+| Magnetic buttons | `[data-magnetic]` — el botón se mueve hacia el cursor (strength 0.38) |
+| 3D tilt cards | `[data-tilt]` — rotateX/Y según posición del cursor, max 9° |
+| Counter animation | `[data-count]` — easeOut cubic desde 0 al valor target, 1600ms |
+| Split text reveal | `[data-split]` — divide por palabras en `<span>`, stagger reveal |
+| Intersection Observer | `.reveal` — fadeInUp al entrar en viewport |
+| Hero word cycle | Ciclo de palabras con transición enter/leave en el h1 del hero |
+| Blob parallax | Los blobs del hero se mueven suavemente siguiendo el ratón |
+| Hero cards parallax | Las tarjetas flotantes del hero responden al movimiento del ratón |
+
+### Overrides del plugin DSB
+
+El tema incluye en `main.css` una sección `/* DSB PLUGIN OVERRIDES */` que adapta los estilos del plugin al design system del tema (colores, border-radius, sombras). Esto permite que el plugin funcione con cualquier tema sin estilos rotos, y que el tema propio se vea perfecto.
+
+### Templates
+
+| Fichero | URL | Descripción |
+|---------|-----|-------------|
+| `front-page.php` | `/` | Landing page del marketplace |
+| `page.php` | `/marketplace/`, `/mi-tienda/`, etc. | Páginas con shortcodes del plugin |
+| `index.php` | Blog fallback | Solo posts del blog |
+| `header.php` | — | Nav fixed con scroll effect |
+| `footer.php` | — | Footer dark con links |
+
+---
+
+## 9. Seguridad
+
+### Checklist implementado
+
+| Medida | Dónde |
+|--------|-------|
+| `check_ajax_referer()` en todos los handlers AJAX | `Ajax`, `Vendor`, `Admin` |
+| `$wpdb->prepare()` en todas las queries | Sin excepción en todo el plugin |
+| `sanitize_text_field()`, `sanitize_textarea_field()`, `sanitize_key()`, `absint()` | Todos los inputs |
+| `esc_html()`, `esc_attr()`, `esc_url()` en todos los outputs | Todos los templates |
+| `wp_kses_post()` para contenido HTML del vendedor | `Ajax::vendor_save_product()` |
+| `current_user_can()` antes de operaciones sensibles | Todos los endpoints de vendedor y admin |
+| Verificación de `post_author` antes de editar/eliminar productos | `Ajax` |
+| Constraint UNIQUE en BD para reviews duplicadas | Schema |
+| `'permission_callback' => '__return_true'` solo en endpoints de lectura pública | `REST_API` |
+| Roles y capabilities custom | `Install::add_roles_and_caps()` |
+
+### Roles y capabilities
+
+| Role | Caps |
+|------|------|
+| `dsb_vendor` | `read`, `upload_files`, `dsb_manage_own_store`, `dsb_manage_own_products` |
+| `administrator` | Todo lo anterior + `dsb_manage_marketplace`, `dsb_manage_vendors` |
+
+---
+
+## 10. Crons y notificaciones
+
+### Registro
+
+```php
+// En Install::activate()
+wp_schedule_event(strtotime('tomorrow 08:00:00'), 'daily', 'dsb_daily_summary');
+wp_schedule_event(strtotime('next monday 09:00:00'), 'weekly', 'dsb_weekly_low_stock');
+
+// En Install::deactivate()
+wp_clear_scheduled_hook('dsb_daily_summary');
+wp_clear_scheduled_hook('dsb_weekly_low_stock');
+```
+
+### wp_cron vs cron real en VPS
+
+`wp_cron` se ejecuta en peticiones HTTP. En producción con poco tráfico, puede retrasarse. Solución: deshabilitar wp_cron y usar cron real del sistema.
+
+En `/etc/crontab` o `crontab -e`:
+```bash
+# Deshabilitar wp_cron en wp-config.php
+define('DISABLE_WP_CRON', true);
+
+# Cron del sistema (cada minuto)
+* * * * * www-data /usr/bin/php /var/www/html/wp-cron.php > /dev/null 2>&1
+```
+
+O con WP-CLI:
+```bash
+* * * * * www-data wp --path=/var/www/html cron event run --due-now > /dev/null 2>&1
+```
+
+---
+
+## 11. Deploy en VPS
+
+### Stack recomendado
+
+```
+Ubuntu 22.04 LTS
+Nginx 1.24
+PHP 8.2-FPM
+MySQL 8.0
+Redis 7 (object cache con wp-redis)
+Let's Encrypt (Certbot)
+WP-CLI
+```
+
+### Script de deploy
+
+```bash
+#!/bin/bash
+set -e
+
+WEBROOT="/var/www/marketraw"
+PLUGIN_PATH="$WEBROOT/wp-content/plugins/dsb-marketplace"
+
+# Pull latest
+cd $WEBROOT
+git pull origin main
+
+# Flush cache
+wp --path=$WEBROOT cache flush
+
+# Reactivar plugin para re-run de migraciones BD si la versión cambió
+CURRENT_VERSION=$(wp --path=$WEBROOT option get dsb_marketplace_version 2>/dev/null || echo "0")
+PLUGIN_VERSION=$(grep "Version:" $PLUGIN_PATH/dsb-marketplace.php | awk '{print $3}')
+
+if [ "$CURRENT_VERSION" != "$PLUGIN_VERSION" ]; then
+  wp --path=$WEBROOT plugin deactivate dsb-marketplace
+  wp --path=$WEBROOT plugin activate dsb-marketplace
+  echo "Plugin actualizado: $CURRENT_VERSION → $PLUGIN_VERSION"
+fi
+
+# Flush rewrite rules
+wp --path=$WEBROOT rewrite flush
+
+echo "Deploy completado."
+```
+
