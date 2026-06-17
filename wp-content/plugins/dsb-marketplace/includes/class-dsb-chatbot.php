@@ -87,22 +87,29 @@ class Chatbot {
             ],
         ];
 
-        $url = self::GEMINI_URL_BASE . self::GEMINI_MODEL . ':generateContent';
-
-        $response = wp_remote_post( $url, [
+        $url  = self::GEMINI_URL_BASE . self::GEMINI_MODEL . ':generateContent';
+        $args = [
             'timeout' => 20,
             'headers' => [
                 'x-goog-api-key' => \constant( 'DSB_GEMINI_API_KEY' ),
                 'Content-Type'   => 'application/json',
             ],
             'body' => wp_json_encode( $body ),
-        ] );
+        ];
+
+        // Gemini devuelve 503 "high demand" con cierta frecuencia en modelos nuevos — 1 reintento basta.
+        $response = wp_remote_post( $url, $args );
+        $code     = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
+
+        if ( 503 === $code ) {
+            $response = wp_remote_post( $url, $args );
+            $code     = is_wp_error( $response ) ? 0 : wp_remote_retrieve_response_code( $response );
+        }
 
         if ( is_wp_error( $response ) ) {
             return $response;
         }
 
-        $code = wp_remote_retrieve_response_code( $response );
         $data = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( 200 !== $code || ! is_array( $data ) ) {
