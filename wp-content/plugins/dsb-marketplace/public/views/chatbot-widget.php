@@ -1,7 +1,7 @@
 <?php
 /**
  * Widget flotante del chatbot IA. Incluido en wp_footer solo si la API key
- * de OpenAI está configurada (ver Frontend::render_chatbot_widget()).
+ * de Gemini está configurada (ver Frontend::render_chatbot_widget()).
  */
 
 \defined( 'ABSPATH' ) || exit;

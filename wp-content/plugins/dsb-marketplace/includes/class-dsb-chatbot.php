@@ -7,8 +7,8 @@ namespace DSB\Marketplace;
 
 class Chatbot {
 
-    private const OPENAI_URL   = 'https://api.openai.com/v1/chat/completions';
-    private const OPENAI_MODEL = 'gpt-4o-mini';
+    private const GEMINI_URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+    private const GEMINI_MODEL    = 'gemini-2.5-flash-lite';
     private const RATE_LIMIT   = 20;   // mensajes
     private const RATE_WINDOW  = 900;  // segundos (15 min), ventana deslizante
     private const MAX_RESULTS  = 5;
@@ -41,7 +41,7 @@ class Chatbot {
             wp_send_json_error( [ 'message' => __( 'Escribe un mensaje.', 'dsb-marketplace' ) ], 400 );
         }
 
-        $parsed = $this->ask_openai( $message );
+        $parsed = $this->ask_gemini( $message );
 
         if ( is_wp_error( $parsed ) ) {
             wp_send_json_error( [ 'message' => $parsed->get_error_message() ], 502 );
@@ -65,32 +65,35 @@ class Chatbot {
     }
 
     // -------------------------------------------------------------------------
-    // OpenAI
+    // Gemini
     // -------------------------------------------------------------------------
 
     public static function is_configured(): bool {
-        return defined( 'DSB_OPENAI_API_KEY' ) && '' !== \constant( 'DSB_OPENAI_API_KEY' );
+        return defined( 'DSB_GEMINI_API_KEY' ) && '' !== \constant( 'DSB_GEMINI_API_KEY' );
     }
 
     /**
      * @return array<string,mixed>|\WP_Error
      */
-    private function ask_openai( string $message ) {
+    private function ask_gemini( string $message ) {
         $body = [
-            'model'           => self::OPENAI_MODEL,
-            'temperature'     => 0.3,
-            'response_format' => [ 'type' => 'json_object' ],
-            'messages'        => [
-                [ 'role' => 'system', 'content' => $this->build_system_prompt() ],
-                [ 'role' => 'user', 'content' => $message ],
+            'system_instruction' => [ 'parts' => [ [ 'text' => $this->build_system_prompt() ] ] ],
+            'contents'           => [
+                [ 'role' => 'user', 'parts' => [ [ 'text' => $message ] ] ],
+            ],
+            'generationConfig'   => [
+                'temperature'     => 0.3,
+                'responseMimeType' => 'application/json',
             ],
         ];
 
-        $response = wp_remote_post( self::OPENAI_URL, [
+        $url = self::GEMINI_URL_BASE . self::GEMINI_MODEL . ':generateContent';
+
+        $response = wp_remote_post( $url, [
             'timeout' => 20,
             'headers' => [
-                'Authorization' => 'Bearer ' . \constant( 'DSB_OPENAI_API_KEY' ),
-                'Content-Type'  => 'application/json',
+                'x-goog-api-key' => \constant( 'DSB_GEMINI_API_KEY' ),
+                'Content-Type'   => 'application/json',
             ],
             'body' => wp_json_encode( $body ),
         ] );
@@ -103,15 +106,15 @@ class Chatbot {
         $data = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( 200 !== $code || ! is_array( $data ) ) {
-            error_log( 'DSB Chatbot: OpenAI HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $response ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
-            return new \WP_Error( 'dsb_openai_http', __( 'El asistente no está disponible ahora mismo.', 'dsb-marketplace' ) );
+            error_log( 'DSB Chatbot: Gemini HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $response ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
+            return new \WP_Error( 'dsb_gemini_http', __( 'El asistente no está disponible ahora mismo.', 'dsb-marketplace' ) );
         }
 
-        $content = $data['choices'][0]['message']['content'] ?? '';
+        $content = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
         $parsed  = json_decode( (string) $content, true );
 
         if ( ! is_array( $parsed ) ) {
-            return new \WP_Error( 'dsb_openai_parse', __( 'No he podido procesar la respuesta del asistente.', 'dsb-marketplace' ) );
+            return new \WP_Error( 'dsb_gemini_parse', __( 'No he podido procesar la respuesta del asistente.', 'dsb-marketplace' ) );
         }
 
         return $parsed;
@@ -218,7 +221,7 @@ class Chatbot {
     }
 
     // -------------------------------------------------------------------------
-    // Rate limiting (ventana deslizante por usuario/IP — evita coste descontrolado en OpenAI)
+    // Rate limiting (ventana deslizante por usuario/IP — evita coste descontrolado en la API externa)
     // -------------------------------------------------------------------------
 
     private function check_rate_limit(): bool {
