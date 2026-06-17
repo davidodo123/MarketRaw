@@ -41,6 +41,7 @@ spl_autoload_register( function ( string $class ): void {
         'Commission'   => 'includes/class-dsb-commission.php',
         'Notification' => 'includes/class-dsb-notification.php',
         'REST_API'     => 'includes/class-dsb-rest-api.php',
+        'Chatbot'      => 'includes/class-dsb-chatbot.php',
         'Ajax'         => 'includes/class-dsb-ajax.php',
         'Admin'        => 'admin/class-dsb-admin.php',
         'Frontend'     => 'public/class-dsb-public.php',

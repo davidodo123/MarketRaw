@@ -12,6 +12,7 @@ class Frontend {
         add_filter( 'query_vars',        [ $this, 'add_query_vars' ] );
         add_filter( 'template_include',  [ $this, 'vendor_store_template' ] );
         add_action( 'wp_enqueue_scripts',[ $this, 'enqueue_assets' ] );
+        add_action( 'wp_footer',         [ $this, 'render_chatbot_widget' ] );
 
         add_shortcode( 'dsb_marketplace',      [ $this, 'render_marketplace' ] );
         add_shortcode( 'dsb_vendor_dashboard', [ $this, 'render_vendor_dashboard' ] );
@@ -62,6 +63,29 @@ class Frontend {
             [],
             DSB_MARKETPLACE_VERSION
         );
+
+        // Chatbot IA — widget flotante en todas las páginas frontend, solo si hay API key configurada
+        if ( Chatbot::is_configured() ) {
+            wp_enqueue_script(
+                'dsb-chatbot',
+                DSB_MARKETPLACE_URL . 'public/assets/js/chatbot.js',
+                [ 'jquery' ],
+                DSB_MARKETPLACE_VERSION,
+                true
+            );
+            wp_localize_script( 'dsb-chatbot', 'dsbChatbot', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'dsb_chatbot_nonce' ),
+                'i18n'    => [
+                    'placeholder' => __( 'Pregúntame por productos o tiendas…', 'dsb-marketplace' ),
+                    'send'        => __( 'Enviar', 'dsb-marketplace' ),
+                    'sending'     => __( 'Pensando…', 'dsb-marketplace' ),
+                    'error'       => __( 'Error de conexión. Inténtalo de nuevo.', 'dsb-marketplace' ),
+                    'greeting'    => __( '¡Hola! Soy el asistente de MarketRaw. ¿Qué estás buscando hoy?', 'dsb-marketplace' ),
+                    'title'       => __( 'Asistente MarketRaw', 'dsb-marketplace' ),
+                ],
+            ] );
+        }
 
         // Marketplace search
         if ( $post && has_shortcode( $post->post_content, 'dsb_marketplace' ) ) {
@@ -180,6 +204,17 @@ class Frontend {
         ob_start();
         include DSB_MARKETPLACE_PATH . 'public/views/vendor-dashboard.php';
         return (string) ob_get_clean();
+    }
+
+    // -------------------------------------------------------------------------
+    // Chatbot IA — widget flotante (Fase 5)
+    // -------------------------------------------------------------------------
+
+    public function render_chatbot_widget(): void {
+        if ( ! Chatbot::is_configured() ) {
+            return;
+        }
+        include DSB_MARKETPLACE_PATH . 'public/views/chatbot-widget.php';
     }
 
     // -------------------------------------------------------------------------

@@ -28,6 +28,7 @@ class Core {
         new Order();
         new Notification();
         new REST_API();
+        new Chatbot();
 
         if ( is_admin() ) {
             new Admin();
