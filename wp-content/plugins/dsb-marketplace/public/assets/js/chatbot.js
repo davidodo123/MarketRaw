@@ -72,9 +72,10 @@
 					appendProducts( response.data.products );
 				}
 			},
-			error: function () {
+			error: function ( jqXHR ) {
 				$typing.remove();
-				appendMessage( 'bot', i18n.error );
+				var serverMessage = jqXHR.responseJSON && jqXHR.responseJSON.data && jqXHR.responseJSON.data.message;
+				appendMessage( 'bot', serverMessage || i18n.error );
 			},
 			complete: function () {
 				isSending = false;
