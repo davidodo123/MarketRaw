@@ -278,8 +278,9 @@
 .dsb-chatbot__panel {
   position: absolute; right: 0; bottom: 72px; width: 340px; height: 460px;
   background: var(--surf); border: 1px solid var(--bord); border-radius: var(--rad);
-  box-shadow: var(--sh-md); display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: var(--sh-md); display: none; flex-direction: column; overflow: hidden;
 }
+.dsb-chatbot.is-open .dsb-chatbot__panel { display: flex; }
 
 .dsb-chatbot__header { padding: 14px 18px; background: var(--p); color: #fff; }
 .dsb-chatbot__title { font-size: .92rem; font-weight: 700; }
