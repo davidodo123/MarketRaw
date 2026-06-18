@@ -24,6 +24,7 @@ class Core {
     private function init_components(): void {
         new Product();
         new Vendor();
+        new Auth();
         new Ajax();
         new Order();
         new Notification();

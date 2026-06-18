@@ -62,6 +62,7 @@ dsb-marketplace/
 │   ├── class-dsb-marketplace.php   ← Core singleton, bootstrap
 │   ├── class-dsb-install.php       ← Tablas BD, roles, páginas, crons (activación)
 │   ├── class-dsb-vendor.php        ← CRUD vendedores, shortcode registro, AJAX
+│   ├── class-dsb-auth.php          ← Login/registro de cuentas, shortcode [dsb_account]
 │   ├── class-dsb-product.php       ← CPT dsb_product, taxonomías, meta boxes
 │   ├── class-dsb-order.php         ← Split de pedidos WC, reversión de reembolsos
 │   ├── class-dsb-commission.php    ← Cálculo de comisiones, estadísticas
@@ -89,7 +90,8 @@ dsb-marketplace/
 │   │   ├── vendor-register.php     ← Formulario de registro de tienda
 │   │   ├── vendor-dashboard.php    ← Dashboard con tabs (productos/pedidos/config)
 │   │   ├── vendor-store.php        ← Página pública /tienda/{slug}/
-│   │   └── chatbot-widget.php      ← Markup del widget flotante del chatbot
+│   │   ├── chatbot-widget.php      ← Markup del widget flotante del chatbot
+│   │   └── account.php             ← Tabs login/registro de /cuenta/
 │   └── assets/
 │       ├── css/public.css
 │       └── js/
@@ -192,7 +194,7 @@ Ejecutada en `register_activation_hook`. Hace:
 
 1. `create_tables()` — crea las 4 tablas con `dbDelta()` (idempotente, safe para updates)
 2. `add_roles_and_caps()` — crea rol `dsb_vendor`, añade caps a `administrator`
-3. `create_pages()` — inserta páginas `marketplace`, `mi-tienda`, `crear-mi-tienda` con shortcodes
+3. `create_pages()` — inserta páginas `marketplace`, `mi-tienda`, `crear-mi-tienda`, `cuenta` con shortcodes
 4. Registra rewrite rule `/tienda/{slug}/`
 5. Programa crons
 6. `flush_rewrite_rules()`
@@ -792,6 +794,8 @@ Base: `POST /wp-admin/admin-ajax.php`
 |--------|-------|--------|-------------|
 | `dsb_search` | `dsb_public_nonce` | `q, category, zone, min_price, max_price, page` | Búsqueda de productos |
 | `dsb_chatbot_message` | `dsb_chatbot_nonce` | `message` | Mensaje al chatbot IA (rate limit 20/15min por usuario/IP) |
+| `dsb_login` | `dsb_account_nonce` | `login, password, remember, redirect_to` | Iniciar sesión (`wp_signon`) |
+| `dsb_register_account` | `dsb_account_nonce` | `name, email, password, redirect_to` | Crear cuenta de comprador (rol `customer`) |
 
 ### Vendedor (requiere login + tienda activa)
 

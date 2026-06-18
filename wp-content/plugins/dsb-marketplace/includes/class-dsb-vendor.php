@@ -53,7 +53,7 @@ class Vendor {
                 . sprintf(
                     /* translators: %s: enlace de login */
                     esc_html__( 'Debes %s para registrar tu tienda.', 'dsb-marketplace' ),
-                    '<a href="' . esc_url( wp_login_url( get_permalink() ) ) . '">'
+                    '<a href="' . esc_url( add_query_arg( 'redirect_to', get_permalink(), home_url( '/cuenta/' ) ) ) . '">'
                     . esc_html__( 'iniciar sesión', 'dsb-marketplace' )
                     . '</a>'
                 )

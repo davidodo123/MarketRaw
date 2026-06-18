@@ -177,7 +177,7 @@ class Frontend {
             return '<p class="dsb-notice dsb-notice--info">'
                 . sprintf(
                     esc_html__( 'Debes %s para acceder a tu panel.', 'dsb-marketplace' ),
-                    '<a href="' . esc_url( wp_login_url( get_permalink() ) ) . '">'
+                    '<a href="' . esc_url( add_query_arg( 'redirect_to', get_permalink(), home_url( '/cuenta/' ) ) ) . '">'
                     . esc_html__( 'iniciar sesión', 'dsb-marketplace' )
                     . '</a>'
                 )

@@ -28,7 +28,7 @@
 				<a href="<?php echo esc_url( home_url( '/mi-tienda/' ) ); ?>">Mi tienda</a>
 				<a href="<?php echo esc_url( wp_logout_url( home_url() ) ); ?>">Salir</a>
 			<?php else : ?>
-				<a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Entrar</a>
+				<a href="<?php echo esc_url( add_query_arg( 'redirect_to', get_permalink(), home_url( '/cuenta/' ) ) ); ?>">Entrar</a>
 			<?php endif; ?>
 			<a href="<?php echo esc_url( home_url( '/crear-mi-tienda/' ) ); ?>" class="nav-cta" data-magnetic>Crear tienda</a>
 		</nav>

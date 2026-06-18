@@ -122,6 +122,7 @@ class Install {
             'marketplace'     => [ 'title' => 'Marketplace',    'content' => '[dsb_marketplace]' ],
             'mi-tienda'       => [ 'title' => 'Mi Tienda',       'content' => '[dsb_vendor_dashboard]' ],
             'crear-mi-tienda' => [ 'title' => 'Crear mi Tienda', 'content' => '[dsb_vendor_register]' ],
+            'cuenta'          => [ 'title' => 'Mi Cuenta',       'content' => '[dsb_account]' ],
         ];
 
         foreach ( $pages as $slug => $data ) {

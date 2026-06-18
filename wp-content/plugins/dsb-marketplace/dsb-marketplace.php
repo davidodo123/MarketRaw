@@ -36,6 +36,7 @@ spl_autoload_register( function ( string $class ): void {
         'Core'         => 'includes/class-dsb-marketplace.php',
         'Install'      => 'includes/class-dsb-install.php',
         'Vendor'       => 'includes/class-dsb-vendor.php',
+        'Auth'         => 'includes/class-dsb-auth.php',
         'Product'      => 'includes/class-dsb-product.php',
         'Order'        => 'includes/class-dsb-order.php',
         'Commission'   => 'includes/class-dsb-commission.php',

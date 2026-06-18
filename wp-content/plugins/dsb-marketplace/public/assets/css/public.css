@@ -159,6 +159,23 @@
 .dsb-form__notice--hidden { display: none; }
 .dsb-form__notice--success { background: var(--g-l); color: var(--g); }
 .dsb-form__notice--error   { background: var(--r-l); color: var(--r); }
+.dsb-form--hidden { display: none; }
+
+/* ── ACCOUNT (login/registro) ─────────────────────────── */
+.dsb-account {
+  max-width: 420px; margin: 0 auto; background: var(--surf);
+  border: 1px solid var(--bord); border-radius: var(--rad);
+  box-shadow: var(--sh); padding: 32px;
+}
+.dsb-account__tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #F4F4F6; border-radius: var(--rad-s); padding: 4px; }
+.dsb-account__tab {
+  flex: 1; padding: 9px 0; border: none; background: transparent; border-radius: 6px;
+  font-size: .88rem; font-weight: 600; color: var(--text2); cursor: pointer; transition: all .2s;
+}
+.dsb-account__tab.is-active { background: var(--surf); color: var(--p); box-shadow: var(--sh); }
+.dsb-account__remember { display: flex; align-items: center; gap: 7px; font-size: .85rem; color: var(--text2); margin-bottom: 18px; cursor: pointer; }
+.dsb-account__forgot { display: block; text-align: center; margin-top: 14px; font-size: .82rem; color: var(--text2); }
+.dsb-account__forgot:hover { color: var(--p); }
 .dsb-btn--primary.dsb-btn { /* reset conflicts */ }
 
 /* ── VENDOR DASHBOARD ─────────────────────────────────── */
