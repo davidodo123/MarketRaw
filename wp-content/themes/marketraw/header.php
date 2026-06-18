@@ -22,8 +22,8 @@
 
 		<nav class="site-nav" id="site-nav" aria-label="Navegación principal">
 			<a href="<?php echo esc_url( home_url( '/marketplace/' ) ); ?>">Explorar</a>
-			<a href="<?php echo esc_url( home_url( '/marketplace/#dsb-filter-categories-wrap' ) ); ?>">Categorías</a>
-			<a href="<?php echo esc_url( home_url( '/marketplace/#dsb-filter-zones-wrap' ) ); ?>">Granada</a>
+			<a href="<?php echo esc_url( home_url( '/marketplace/' ) ); ?>">Categorías</a>
+			<a href="<?php echo esc_url( home_url( '/marketplace/' ) ); ?>">Granada</a>
 			<?php if ( is_user_logged_in() ) : ?>
 				<a href="<?php echo esc_url( home_url( '/mi-tienda/' ) ); ?>">Mi tienda</a>
 				<a href="<?php echo esc_url( wp_logout_url( home_url() ) ); ?>">Salir</a>
