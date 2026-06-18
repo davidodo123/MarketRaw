@@ -49,18 +49,29 @@ class Chatbot {
 
         $reply    = (string) ( $parsed['reply'] ?? __( 'No he entendido tu pregunta, ¿puedes reformularla?', 'dsb-marketplace' ) );
         $products = [];
+        $stores   = [];
 
         if ( 'search' === ( $parsed['intent'] ?? '' ) ) {
-            $products = $this->run_search( is_array( $parsed['search'] ?? null ) ? $parsed['search'] : [] );
+            $search = is_array( $parsed['search'] ?? null ) ? $parsed['search'] : [];
+            $target = 'vendors' === ( $search['target'] ?? '' ) ? 'vendors' : 'products';
 
-            if ( ! $products ) {
-                $reply .= ' ' . __( 'No he encontrado productos que coincidan, prueba con otros términos.', 'dsb-marketplace' );
+            if ( 'vendors' === $target ) {
+                $stores = $this->run_search_vendors( $search );
+                if ( ! $stores ) {
+                    $reply .= ' ' . __( 'No he encontrado tiendas que coincidan, prueba con otro nombre.', 'dsb-marketplace' );
+                }
+            } else {
+                $products = $this->run_search_products( $search );
+                if ( ! $products ) {
+                    $reply .= ' ' . __( 'No he encontrado productos que coincidan, prueba con otros términos.', 'dsb-marketplace' );
+                }
             }
         }
 
         wp_send_json_success( [
             'reply'    => $reply,
             'products' => $products,
+            'stores'   => $stores,
         ] );
     }
 
@@ -136,9 +147,11 @@ class Chatbot {
             . 'Zonas disponibles (nombre y slug entre paréntesis): ' . ( $zones ?: 'ninguna' ) . ".\n"
             . "Responde SIEMPRE con un único objeto JSON, sin texto fuera del JSON, con esta forma exacta:\n"
             . '{"intent":"search|smalltalk","reply":"<respuesta breve en español, natural y amable, máximo 2 frases>",'
-            . '"search":{"q":"","category":"","zone":"","min_price":0,"max_price":0}}' . "\n"
+            . '"search":{"target":"products|vendors","q":"","category":"","zone":"","min_price":0,"max_price":0}}' . "\n"
             . "Usa intent=\"search\" cuando el usuario busque productos o tiendas. "
-            . "\"category\" y \"zone\" deben ser exactamente el slug entre paréntesis de la lista o cadena vacía si no aplica. "
+            . "\"target\"=\"vendors\" cuando el usuario busca una TIENDA/NEGOCIO concreto por nombre (ej: \"la tienda Sabas\", \"el negocio de X\"); en ese caso pon el nombre de la tienda en \"q\". "
+            . "\"target\"=\"products\" cuando busca artículos/productos a comprar (caso por defecto). "
+            . "\"category\" y \"zone\" deben ser exactamente el slug entre paréntesis de la lista o cadena vacía si no aplica (solo tienen sentido con target=products). "
             . "Usa intent=\"smalltalk\" para saludos, agradecimientos o preguntas generales; en ese caso \"search\" puede ir vacío. "
             . 'No inventes productos, precios ni tiendas — el servidor se encarga de buscarlos.';
     }
@@ -159,7 +172,7 @@ class Chatbot {
     // Búsqueda interna (mismos filtros que REST_API::get_products / Ajax::search)
     // -------------------------------------------------------------------------
 
-    private function run_search( array $params ): array {
+    private function run_search_products( array $params ): array {
         $q         = sanitize_text_field( (string) ( $params['q'] ?? '' ) );
         $category  = sanitize_title( (string) ( $params['category'] ?? '' ) );
         $zone      = sanitize_title( (string) ( $params['zone'] ?? '' ) );
@@ -225,6 +238,43 @@ class Chatbot {
         wp_reset_postdata();
 
         return $products;
+    }
+
+    // -------------------------------------------------------------------------
+    // Búsqueda interna de tiendas (mismo criterio que REST_API::search, rama vendors)
+    // -------------------------------------------------------------------------
+
+    private function run_search_vendors( array $params ): array {
+        $q = sanitize_text_field( (string) ( $params['q'] ?? '' ) );
+
+        if ( '' === $q ) {
+            return [];
+        }
+
+        global $wpdb;
+
+        $like = '%' . $wpdb->esc_like( $q ) . '%';
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT store_name, store_slug, description, logo_id
+                 FROM {$wpdb->prefix}dsb_vendors
+                 WHERE status = 'active'
+                   AND ( store_name LIKE %s OR description LIKE %s )
+                 LIMIT %d",
+                $like,
+                $like,
+                self::MAX_RESULTS
+            )
+        );
+
+        return array_map( static function ( $row ) {
+            return [
+                'title'     => $row->store_name,
+                'thumbnail' => $row->logo_id ? (string) wp_get_attachment_url( (int) $row->logo_id ) : '',
+                'url'       => home_url( '/tienda/' . $row->store_slug . '/' ),
+                'vendor'    => $row->store_name,
+            ];
+        }, $rows ?: [] );
     }
 
     // -------------------------------------------------------------------------

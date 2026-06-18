@@ -71,6 +71,9 @@
 				if ( response.data.products && response.data.products.length ) {
 					appendProducts( response.data.products );
 				}
+				if ( response.data.stores && response.data.stores.length ) {
+					appendProducts( response.data.stores );
+				}
 			},
 			error: function ( jqXHR ) {
 				$typing.remove();

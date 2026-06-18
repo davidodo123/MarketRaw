@@ -68,7 +68,7 @@ dsb-marketplace/
 │   ├── class-dsb-commission.php    ← Cálculo de comisiones, estadísticas
 │   ├── class-dsb-notification.php  ← Emails inmediatos, crons diario/semanal
 │   ├── class-dsb-rest-api.php      ← Endpoints REST /dsb/v1/*
-│   ├── class-dsb-chatbot.php       ← Chatbot IA (OpenAI), AJAX dsb_chatbot_message
+│   ├── class-dsb-chatbot.php       ← Chatbot IA (Gemini), AJAX dsb_chatbot_message
 │   ├── class-dsb-ajax.php          ← Handlers AJAX públicos y de vendedor
 │   └── class-dsb-notification.php
 ├── admin/
@@ -382,7 +382,9 @@ Implementada en `REST_API::register_routes()` via `rest_api_init`. Todos los end
 
 ### Chatbot IA — Clase `Chatbot`
 
-Widget flotante en el frontend que traduce lenguaje natural a una búsqueda estructurada usando OpenAI `gpt-4o-mini`. Implementado en `includes/class-dsb-chatbot.php`.
+Widget flotante en el frontend que traduce lenguaje natural a una búsqueda estructurada usando Google Gemini `gemini-2.5-flash-lite`. Implementado en `includes/class-dsb-chatbot.php`.
+
+> Nota: la versión inicial usaba OpenAI `gpt-4o-mini` (así lo describía la planificación original). Se cambió a Gemini antes de salir de desarrollo porque era la API disponible en ese momento — ver `ask_gemini()`. El diseño (1 sola llamada, JSON mode, búsqueda interna) es el mismo, solo cambia el proveedor.
 
 **Por qué AJAX y no REST:** el resto de acciones públicas del plugin (`dsb_search`) ya usan `admin-ajax.php` con nonce; el chatbot sigue la misma convención en vez de introducir un segundo mecanismo de transporte.
 
@@ -395,10 +397,13 @@ Usuario escribe mensaje en el widget
    1. check_ajax_referer()
    2. rate limit (ventana deslizante, ver abajo)
    3. sanitiza y trunca el mensaje (400 chars máx)
-   4. Chatbot::ask_openai() — 1 sola llamada a OpenAI, JSON mode
-   5. si intent="search" → Chatbot::run_search() (WP_Query interno, mismos filtros
-      que REST_API::get_products / Ajax::search: q, category slug, zone slug, min/max price)
-   6. responde JSON { reply, products[] }
+   4. Chatbot::ask_gemini() — 1 sola llamada a Gemini, JSON mode
+   5. si intent="search" y target="products" → Chatbot::run_search_products() (WP_Query
+      interno, mismos filtros que REST_API::get_products / Ajax::search: q, category slug,
+      zone slug, min/max price)
+      si intent="search" y target="vendors" → Chatbot::run_search_vendors() ($wpdb LIKE
+      sobre store_name/description, solo tiendas active)
+   6. responde JSON { reply, products[], stores[] }
 → chatbot.js renderiza la respuesta + tarjetas de producto (si hay)
 ```
 
@@ -410,32 +415,33 @@ El system prompt inyecta dinámicamente las categorías y zonas existentes (`get
 {
   "intent": "search|smalltalk",
   "reply": "<respuesta breve en español>",
-  "search": { "q": "", "category": "", "zone": "", "min_price": 0, "max_price": 0 }
+  "search": { "target": "products|vendors", "q": "", "category": "", "zone": "", "min_price": 0, "max_price": 0 }
 }
 ```
 
-- `intent=search` → el servidor ejecuta `run_search()` con los params devueltos y añade hasta 5 tarjetas de producto debajo de la respuesta del modelo.
-- `intent=smalltalk` → no se ejecuta ninguna búsqueda (saludos, agradecimientos, preguntas generales); ahorra una llamada a `WP_Query` y mantiene el coste de la conversación bajo.
-- El modelo **nunca** inventa productos ni precios — solo propone los parámetros de búsqueda; los datos reales siempre vienen de la BD vía `WP_Query`.
+- `intent=search` + `target=products` (default) → el servidor ejecuta `run_search_products()` con los params devueltos y añade hasta 5 tarjetas de producto debajo de la respuesta del modelo.
+- `intent=search` + `target=vendors` → el modelo detectó que el usuario busca una tienda/negocio concreto por nombre (ej. "la tienda Sabas"); el servidor ejecuta `run_search_vendors()` (`$wpdb` LIKE sobre `store_name`/`description`, solo tiendas `active`) y devuelve tarjetas de tienda en vez de producto.
+- `intent=smalltalk` → no se ejecuta ninguna búsqueda (saludos, agradecimientos, preguntas generales); ahorra una llamada a `WP_Query`/`$wpdb` y mantiene el coste de la conversación bajo.
+- El modelo **nunca** inventa productos, tiendas ni precios — solo propone los parámetros de búsqueda; los datos reales siempre vienen de la BD.
 
-**Por qué una sola llamada a OpenAI (no dos):** la documentación original planteaba "llamar a `/dsb/v1/search` y reformatear en lenguaje natural" como dos pasos separados. En la implementación, el propio modelo devuelve ya una frase de introducción natural (`reply`) junto con los parámetros de búsqueda en la misma llamada; el servidor solo añade la lista de productos en PHP. Esto reduce coste y latencia a la mitad frente a una segunda llamada de "reformateo", sin perder naturalidad en la respuesta.
+**Por qué una sola llamada a Gemini (no dos):** la documentación original planteaba "llamar a `/dsb/v1/search` y reformatear en lenguaje natural" como dos pasos separados. En la implementación, el propio modelo devuelve ya una frase de introducción natural (`reply`) junto con los parámetros de búsqueda en la misma llamada; el servidor solo añade la lista de productos/tiendas en PHP. Esto reduce coste y latencia a la mitad frente a una segunda llamada de "reformateo", sin perder naturalidad en la respuesta.
 
-**Sin memoria de conversación (v1):** cada mensaje se trata de forma independiente, sin historial. Igual que el resto de decisiones de "simplicidad intencional" del plugin (ver Fase 2, tab state en memoria): el caso de uso real es búsquedas puntuales, no diálogos largos. Si se necesita contexto multi-turno en el futuro, el punto de extensión es pasar los últimos N mensajes en el array `messages` de `ask_openai()`.
+**Sin memoria de conversación (v1):** cada mensaje se trata de forma independiente, sin historial. Igual que el resto de decisiones de "simplicidad intencional" del plugin (ver Fase 2, tab state en memoria): el caso de uso real es búsquedas puntuales, no diálogos largos. Si se necesita contexto multi-turno en el futuro, el punto de extensión es pasar los últimos mensajes en el array `contents` de `ask_gemini()`.
 
 #### Rate limiting
 
-`check_rate_limit()` usa un transient por usuario (`get_current_user_id()`) o por IP (`REMOTE_ADDR`) si no hay sesión: máximo 20 mensajes por ventana deslizante de 15 minutos. Cada mensaje nuevo renueva la expiración del transient, así que un usuario activo de forma continuada nunca "resetea" su contador a mitad de conversación — el límite es sobre 20 mensajes acumulados mientras la conversación esté viva. Es la única protección de coste contra el uso de la API de OpenAI; a diferencia del rate limiting de `dsb_search` (pendiente, ver [[Futuras mejoras]]), aquí se implementó desde el principio porque cada mensaje tiene coste real en la API externa.
+`check_rate_limit()` usa un transient por usuario (`get_current_user_id()`) o por IP (`REMOTE_ADDR`) si no hay sesión: máximo 20 mensajes por ventana deslizante de 15 minutos. Cada mensaje nuevo renueva la expiración del transient, así que un usuario activo de forma continuada nunca "resetea" su contador a mitad de conversación — el límite es sobre 20 mensajes acumulados mientras la conversación esté viva. Es la única protección de coste contra el uso de la API externa; a diferencia del rate limiting de `dsb_search` (pendiente, ver [[Futuras mejoras]]), aquí se implementó desde el principio porque cada mensaje tiene coste real en la API de Gemini.
 
 #### Seguridad y configuración
 
-- La API key de OpenAI se lee de la constante `DSB_OPENAI_API_KEY`, definida en `wp-config.php` — **nunca** se expone en JS ni se guarda en BD:
+- La API key de Gemini se lee de la constante `DSB_GEMINI_API_KEY`, definida en `wp-config.php` — **nunca** se expone en JS ni se guarda en BD:
   ```php
-  define( 'DSB_OPENAI_API_KEY', 'sk-...' );
+  define( 'DSB_GEMINI_API_KEY', 'AQ...' );
   ```
 - `Chatbot::is_configured()` comprueba que la constante existe y no está vacía. Si no está configurada, el AJAX devuelve 503 y — más importante — **el widget ni se encola ni se renderiza** (`Frontend::enqueue_assets()` / `render_chatbot_widget()` lo comprueban antes de hacer nada), así que en un sitio sin la key configurada no aparece ningún botón flotante roto.
 - `check_ajax_referer( 'dsb_chatbot_nonce', 'nonce' )` en el handler, igual que el resto de AJAX del plugin.
-- Mensaje del usuario truncado a 400 caracteres antes de enviarlo a OpenAI.
-- Llamada a OpenAI vía `wp_remote_post()` (no cURL directo), timeout 20s, errores logueados con `error_log()` sin exponer detalles internos en la respuesta al cliente.
+- Mensaje del usuario truncado a 400 caracteres antes de enviarlo a Gemini.
+- Llamada a Gemini vía `wp_remote_post()` (no cURL directo), timeout 20s, 1 reintento automático en 503 ("high demand", frecuente en modelos nuevos), errores logueados con `error_log()` sin exponer detalles internos en la respuesta al cliente.
 
 #### Frontend: widget flotante
 
@@ -445,7 +451,7 @@ El system prompt inyecta dinámicamente las categorías y zonas existentes (`get
 
 #### Por qué no REST para esto
 
-El endpoint `GET /dsb/v1/search` de Fase 4 ya existía pensado para este caso de uso, pero el chatbot llama a la misma lógica de búsqueda **directamente en PHP** (`Chatbot::run_search()`, una copia ligera de los filtros de `REST_API::get_products()`) en vez de hacer una petición HTTP interna a su propia REST API. Evita una vuelta HTTP completa (con su propio nonce/auth) por cada mensaje del chatbot, a costa de una pequeña duplicación de la lógica de filtros que ya existía en tres sitios (`Ajax::search`, `REST_API::get_products`, `REST_API::search`).
+El endpoint `GET /dsb/v1/search` de Fase 4 ya existía pensado para este caso de uso, pero el chatbot llama a la misma lógica de búsqueda **directamente en PHP** (`Chatbot::run_search_products()`/`run_search_vendors()`, copias ligeras de los filtros de `REST_API::get_products()` y de la rama vendors de `REST_API::search()`) en vez de hacer una petición HTTP interna a su propia REST API. Evita una vuelta HTTP completa (con su propio nonce/auth) por cada mensaje del chatbot, a costa de una pequeña duplicación de la lógica de filtros que ya existía en tres sitios (`Ajax::search`, `REST_API::get_products`, `REST_API::search`).
 
 ---
 
@@ -671,7 +677,7 @@ server {
 
 **Chatbot — memoria de conversación**
 - v1 trata cada mensaje de forma independiente (ver Fase 5)
-- Si se necesita contexto multi-turno, pasar los últimos N mensajes en `Chatbot::ask_openai()`
+- Si se necesita contexto multi-turno, pasar los últimos mensajes en `Chatbot::ask_gemini()`
 
 ---
 
@@ -750,7 +756,7 @@ server {
 - `Commission::calculate()` — casos límite (rate=0, rate=100, primer mes)
 - `Vendor::generate_unique_slug()` — colisiones
 - `Order::split_order()` — idempotencia, pedidos multi-vendor
-- `Chatbot::run_search()` — mapeo de params del modelo a filtros de `WP_Query`
+- `Chatbot::run_search_products()` / `run_search_vendors()` — mapeo de params del modelo a filtros de `WP_Query`/`$wpdb`
 
 **Integration tests**
 - Flujo completo de registro → aprobación → producto → pedido → split
