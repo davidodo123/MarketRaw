@@ -149,7 +149,7 @@ class Chatbot {
             . '{"intent":"search|smalltalk","reply":"<respuesta breve en español, natural y amable, máximo 2 frases>",'
             . '"search":{"target":"products|vendors","q":"","category":"","zone":"","min_price":0,"max_price":0}}' . "\n"
             . "Usa intent=\"search\" cuando el usuario busque productos o tiendas. "
-            . "\"target\"=\"vendors\" cuando el usuario busca una TIENDA/NEGOCIO concreto por nombre (ej: \"la tienda Sabas\", \"el negocio de X\"); en ese caso pon el nombre de la tienda en \"q\". "
+            . "\"target\"=\"vendors\" cuando el usuario busca una TIENDA/NEGOCIO, ya sea por nombre concreto (ej: \"la tienda Sabas\" → \"q\":\"Sabas\") o pidiendo ver el listado general (ej: \"qué tiendas hay\", \"qué negocios tenéis\" → \"q\":\"\", el servidor devuelve las tiendas activas). Nunca respondas que no tienes acceso al listado: usa target=vendors con q vacío. "
             . "\"target\"=\"products\" cuando busca artículos/productos a comprar (caso por defecto). "
             . "\"category\" y \"zone\" deben ser exactamente el slug entre paréntesis de la lista o cadena vacía si no aplica (solo tienen sentido con target=products). "
             . "Usa intent=\"smalltalk\" para saludos, agradecimientos o preguntas generales; en ese caso \"search\" puede ir vacío. "
@@ -247,25 +247,35 @@ class Chatbot {
     private function run_search_vendors( array $params ): array {
         $q = sanitize_text_field( (string) ( $params['q'] ?? '' ) );
 
-        if ( '' === $q ) {
-            return [];
-        }
-
         global $wpdb;
 
-        $like = '%' . $wpdb->esc_like( $q ) . '%';
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT store_name, store_slug, description, logo_id
-                 FROM {$wpdb->prefix}dsb_vendors
-                 WHERE status = 'active'
-                   AND ( store_name LIKE %s OR description LIKE %s )
-                 LIMIT %d",
-                $like,
-                $like,
-                self::MAX_RESULTS
-            )
-        );
+        if ( '' === $q ) {
+            // Sin nombre concreto: el usuario pide "qué tiendas hay" — listamos las activas.
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT store_name, store_slug, description, logo_id
+                     FROM {$wpdb->prefix}dsb_vendors
+                     WHERE status = 'active'
+                     ORDER BY store_name ASC
+                     LIMIT %d",
+                    self::MAX_RESULTS
+                )
+            );
+        } else {
+            $like = '%' . $wpdb->esc_like( $q ) . '%';
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT store_name, store_slug, description, logo_id
+                     FROM {$wpdb->prefix}dsb_vendors
+                     WHERE status = 'active'
+                       AND ( store_name LIKE %s OR description LIKE %s )
+                     LIMIT %d",
+                    $like,
+                    $like,
+                    self::MAX_RESULTS
+                )
+            );
+        }
 
         return array_map( static function ( $row ) {
             return [
