@@ -20,6 +20,9 @@
 .dsb-status--pending   { background: #fef3c7; color: #92400e; }
 .dsb-status--active    { background: #d1fae5; color: #065f46; }
 .dsb-status--suspended { background: #fee2e2; color: #991b1b; }
+.dsb-status--completed  { background: #d1fae5; color: #065f46; }
+.dsb-status--processing { background: #ede9fe; color: #5b21b6; }
+.dsb-status--refunded   { background: #f3f4f6; color: #374151; }
 
 .dsb-vendors-table .dsb-vendor-actions { white-space: nowrap; }
 

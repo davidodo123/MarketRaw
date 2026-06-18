@@ -73,10 +73,14 @@ dsb-marketplace/
 │   └── class-dsb-notification.php
 ├── admin/
 │   ├── class-dsb-admin.php         ← Admin menu, enqueue, AJAX admin
+│   ├── class-dsb-vendors-table.php ← WP_List_Table de tiendas (vista + filtros + acciones)
+│   ├── class-dsb-orders-table.php  ← WP_List_Table de pedidos multi-vendor
+│   ├── class-dsb-payouts-table.php ← WP_List_Table de tiendas con balance pendiente
 │   ├── views/
 │   │   ├── dashboard.php           ← Panel principal con stats globales
-│   │   ├── vendors.php             ← Listado y aprobación de tiendas
-│   │   ├── orders.php              ← Pedidos multi-vendor con paginación
+│   │   ├── vendors.php             ← Instancia Vendors_Table
+│   │   ├── orders.php              ← Instancia Orders_Table
+│   │   ├── payouts.php             ← Instancia Payouts_Table + botón "marcar pagado"
 │   │   ├── settings.php            ← Configuración global (% comisión)
 │   │   ├── product-pricing-meta.php
 │   │   └── product-gallery-meta.php
@@ -650,10 +654,9 @@ server {
 ### Mejoras de backend
 
 **Sistema de pagos a vendedores (payouts)**
-- Actualmente el saldo se acumula en `dsb_vendors.balance`
-- Implementar botón "Solicitar pago" en dashboard → crea registro en tabla `dsb_payouts`
-- Admin revisa y marca como pagado → actualiza balance y crea transacción `withdrawal`
-- Integrar con Stripe Connect o transferencia bancaria manual
+- ✅ Lado admin implementado: `admin.php?page=dsb-payouts` lista tiendas activas con `balance > 0` (`Vendor::get_vendors_with_balance()`), botón "Marcar como pagado" pone el balance a 0 y registra una transacción `withdrawal` (`Vendor::mark_vendor_paid()`). No mueve dinero real, solo refleja que el pago ya se hizo por fuera (transferencia/Stripe manual).
+- ⬜ Falta el lado vendedor: botón "Solicitar pago" en el dashboard → tabla `dsb_payouts` con cola de solicitudes (ahora el admin paga "a ciegas" sin que el vendedor lo pida explícitamente)
+- ⬜ Integración real con Stripe Connect o automatización de transferencia bancaria
 
 **Comisiones dinámicas**
 - Comisión por categoría (ej: electrónica 15%, artesanía 8%)
@@ -818,6 +821,7 @@ Base: `POST /wp-admin/admin-ajax.php`
 | Action | Nonce | Params | Descripción |
 |--------|-------|--------|-------------|
 | `dsb_update_vendor_status` | `dsb_admin_nonce` | `vendor_id, status` | Aprobar/suspender tienda |
+| `dsb_mark_vendor_paid` | `dsb_admin_nonce` | `vendor_id` | Marcar balance de tienda como pagado (`/wp-admin/admin.php?page=dsb-payouts`) |
 
 ---
 

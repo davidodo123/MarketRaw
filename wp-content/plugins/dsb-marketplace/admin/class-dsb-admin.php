@@ -11,6 +11,7 @@ class Admin {
         add_action( 'admin_menu',            [ $this, 'register_menu' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
         add_action( 'wp_ajax_dsb_update_vendor_status', [ $this, 'ajax_update_vendor_status' ] );
+        add_action( 'wp_ajax_dsb_mark_vendor_paid',     [ $this, 'ajax_mark_vendor_paid' ] );
     }
 
     public function register_menu(): void {
@@ -44,6 +45,15 @@ class Admin {
 
         add_submenu_page(
             'dsb-marketplace',
+            __( 'Payouts', 'dsb-marketplace' ),
+            __( 'Payouts', 'dsb-marketplace' ),
+            'dsb_manage_vendors',
+            'dsb-payouts',
+            [ $this, 'render_payouts_page' ]
+        );
+
+        add_submenu_page(
+            'dsb-marketplace',
             __( 'Productos', 'dsb-marketplace' ),
             __( 'Productos', 'dsb-marketplace' ),
             'dsb_manage_marketplace',
@@ -61,7 +71,13 @@ class Admin {
     }
 
     public function enqueue_assets( string $hook ): void {
-        $dsb_pages = [ 'toplevel_page_dsb-marketplace', 'marketplace_page_dsb-vendors', 'marketplace_page_dsb-settings' ];
+        $dsb_pages = [
+            'toplevel_page_dsb-marketplace',
+            'marketplace_page_dsb-vendors',
+            'marketplace_page_dsb-orders',
+            'marketplace_page_dsb-payouts',
+            'marketplace_page_dsb-settings',
+        ];
 
         if ( ! in_array( $hook, $dsb_pages, true ) ) {
             return;
@@ -86,8 +102,9 @@ class Admin {
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'nonce'   => wp_create_nonce( 'dsb_admin_nonce' ),
             'i18n'    => [
-                'confirm' => __( '¿Confirmar cambio de estado?', 'dsb-marketplace' ),
-                'error'   => __( 'Error de conexión.', 'dsb-marketplace' ),
+                'confirm'      => __( '¿Confirmar cambio de estado?', 'dsb-marketplace' ),
+                'confirmPaid'  => __( '¿Confirmar que ya se ha pagado este balance? Esta acción no se puede deshacer.', 'dsb-marketplace' ),
+                'error'        => __( 'Error de conexión.', 'dsb-marketplace' ),
             ],
         ] );
     }
@@ -106,6 +123,10 @@ class Admin {
 
     public function render_settings_page(): void {
         include DSB_MARKETPLACE_PATH . 'admin/views/settings.php';
+    }
+
+    public function render_payouts_page(): void {
+        include DSB_MARKETPLACE_PATH . 'admin/views/payouts.php';
     }
 
     public function ajax_update_vendor_status(): void {
@@ -130,5 +151,27 @@ class Admin {
         }
 
         wp_send_json_success( [ 'message' => __( 'Estado actualizado.', 'dsb-marketplace' ) ] );
+    }
+
+    public function ajax_mark_vendor_paid(): void {
+        check_ajax_referer( 'dsb_admin_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'dsb_manage_vendors' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'dsb-marketplace' ) ], 403 );
+        }
+
+        $vendor_id = absint( $_POST['vendor_id'] ?? 0 );
+        if ( ! $vendor_id ) {
+            wp_send_json_error( [ 'message' => __( 'ID inválido.', 'dsb-marketplace' ) ], 400 );
+        }
+
+        $vendor = new Vendor();
+        $ok     = $vendor->mark_vendor_paid( $vendor_id );
+
+        if ( ! $ok ) {
+            wp_send_json_error( [ 'message' => __( 'No se pudo marcar como pagado (¿balance ya en 0?).', 'dsb-marketplace' ) ], 500 );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Marcado como pagado.', 'dsb-marketplace' ) ] );
     }
 }

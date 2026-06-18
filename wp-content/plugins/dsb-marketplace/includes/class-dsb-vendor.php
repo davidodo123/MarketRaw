@@ -254,6 +254,63 @@ class Vendor {
         return $vendor && 'active' === $vendor->status;
     }
 
+    /**
+     * Tiendas activas con saldo pendiente de cobro, ordenadas de mayor a menor balance.
+     * Usado por el panel admin de payouts.
+     */
+    public function get_vendors_with_balance(): array {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT * FROM {$wpdb->prefix}dsb_vendors
+             WHERE status = 'active' AND balance > 0
+             ORDER BY balance DESC"
+        );
+
+        return $rows ?: [];
+    }
+
+    /**
+     * Marca el balance actual de una tienda como pagado: lo pone a 0 y registra
+     * la transacción de tipo 'withdrawal'. No mueve dinero de verdad — eso es manual
+     * (transferencia/Stripe fuera de banda), esto solo refleja que ya se pagó.
+     */
+    public function mark_vendor_paid( int $vendor_id ): bool {
+        global $wpdb;
+
+        $vendor = $this->get_vendor_by_id( $vendor_id );
+        if ( ! $vendor || (float) $vendor->balance <= 0 ) {
+            return false;
+        }
+
+        $balance = (float) $vendor->balance;
+
+        $updated = $wpdb->update(
+            $wpdb->prefix . 'dsb_vendors',
+            [ 'balance' => 0 ],
+            [ 'id' => $vendor_id ],
+            [ '%f' ],
+            [ '%d' ]
+        );
+
+        if ( false === $updated ) {
+            return false;
+        }
+
+        $wpdb->insert(
+            $wpdb->prefix . 'dsb_transactions',
+            [
+                'vendor_id' => $vendor_id,
+                'type'      => 'withdrawal',
+                'amount'    => -$balance,
+                'reference' => 'PAYOUT-' . $vendor_id . '-' . current_time( 'Ymd-His' ),
+            ],
+            [ '%d', '%s', '%f', '%s' ]
+        );
+
+        return true;
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
