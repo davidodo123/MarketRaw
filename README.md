@@ -40,7 +40,8 @@ Sin dependencias de build (Webpack/Vite/npm): todo el JS/CSS del plugin y del te
 - [x] **Fase 2** — Dashboard de vendedor (tabs: productos/pedidos/configuración), búsqueda AJAX con filtros (`$wpdb` raw), página pública `/tienda/{slug}/`, sistema de reseñas
 - [x] **Fase 3** — Split automático de pedidos WooCommerce por vendedor, cálculo de comisiones (con primer mes gratis), notificaciones por email, crons (resumen diario, stock bajo semanal)
 - [x] **Fase 4** — API REST (`/wp-json/dsb/v1/*`): vendors, productos, reseñas, búsqueda full-text, auth vía WP Application Passwords
-- [x] **Fase 5** — Chatbot IA flotante: lenguaje natural → búsqueda estructurada (Gemini decide intención + parámetros, el servidor ejecuta la búsqueda real y nunca permite que el modelo invente productos o precios)
+- [x] **Fase 5** — Chatbot IA flotante: lenguaje natural → búsqueda estructurada (Gemini decide intención, parámetros y si busca productos o una tienda concreta; el servidor ejecuta la búsqueda real y nunca permite que el modelo invente productos, tiendas o precios)
+- [x] Página de login/registro custom (`/cuenta/`) — reemplaza wp-login.php, AJAX propio con `wp_signon`/`wp_insert_user`
 - [ ] Admin panel completo (`WP_List_Table`, vista de payouts)
 - [ ] Sistema de pagos a vendedores (payouts)
 - [ ] Testing automatizado (PHPUnit)
@@ -55,7 +56,7 @@ Detalle técnico completo de cada fase, schema de BD, endpoints y decisiones de 
 ```
 wp-content/
 ├── plugins/dsb-marketplace/
-│   ├── includes/      → Core (singleton), Install, Vendor, Product, Order,
+│   ├── includes/      → Core (singleton), Install, Vendor, Auth, Product, Order,
 │   │                     Commission, Notification, REST_API, Chatbot, Ajax
 │   ├── admin/          → Menú admin, vistas (dashboard/vendors/orders/settings)
 │   └── public/         → Shortcodes, rewrite rules, vistas, assets (js/css)
@@ -67,7 +68,7 @@ wp-content/
 
 **Principios del plugin:** una clase por fichero, autoloader por mapa explícito (sin magic), `$wpdb->prepare()` sin excepciones, nonces en todo AJAX, ownership check (`post_author`) antes de editar/eliminar contenido de vendedor.
 
-Páginas auto-creadas en la activación del plugin: `/marketplace/`, `/mi-tienda/`, `/crear-mi-tienda/`, y `/tienda/{slug}/` (rewrite rule, no es página de WP).
+Páginas auto-creadas en la activación del plugin: `/marketplace/`, `/mi-tienda/`, `/crear-mi-tienda/`, `/cuenta/`, y `/tienda/{slug}/` (rewrite rule, no es página de WP).
 
 ---
 
