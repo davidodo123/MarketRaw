@@ -124,7 +124,14 @@ ul { list-style: none; }
 .btn:hover svg { transform: translateX(4px); }
 
 /* Primario: tinta → granate con cortina */
-.btn--primary { background: var(--ink); color: var(--paper); }
+.btn--primary { background: transparent; color: var(--paper); z-index: 0; }
+.btn--primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  z-index: -2;
+}
 .btn--primary::before {
   content: '';
   position: absolute;
@@ -135,7 +142,6 @@ ul { list-style: none; }
   transition: transform 0.45s var(--ease);
   z-index: -1;
 }
-.btn--primary { z-index: 0; }
 .btn--primary:hover::before { transform: scaleX(1); }
 
 /* Ghost: hairline */
@@ -655,14 +661,8 @@ ul { list-style: none; }
   border: 1px solid var(--line-2);
   padding: 44px 44px 40px;
   position: relative;
-}
-.vendor-cta__card::after {
-  content: '';
-  position: absolute;
-  top: 10px; left: 10px; right: -10px; bottom: -10px;
-  border: 1px solid var(--line);
-  pointer-events: none;
-  z-index: -1;
+  /* segunda «hoja» desplazada detrás de la ficha */
+  box-shadow: 12px 12px 0 -1px var(--paper-2), 12px 12px 0 0 var(--line-2);
 }
 .vendor-cta__card-badge {
   font-size: 0.66rem;
