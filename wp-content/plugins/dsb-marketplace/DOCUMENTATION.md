@@ -463,33 +463,39 @@ El endpoint `GET /dsb/v1/search` de Fase 4 ya existía pensado para este caso de
 
 El tema `marketraw` es un tema custom minimalista que sirve como frontend del marketplace. **No es un tema de uso general** — está diseñado específicamente para el plugin.
 
-### Design System
+### Design System (v2.0.0 — editorial)
 
-Variables CSS en `:root`:
-- Colores base: `--bg`, `--surface`, `--surface-2`, `--surface-3`
-- Accentos: `--purple` (#7C3AED), `--orange` (#F97316), `--cyan`, `--green`, `--pink`
-- Gradiente principal: `--grad-text` (purple → pink → orange)
-- Sombras: `--shadow-sm`, `--shadow`, `--shadow-md`, `--shadow-lg`
+Rediseño completo: estética editorial tipo revista — papel + tinta + rojo granada (guiño a la ciudad), serif de alto contraste y hairlines en lugar de sombras y gradientes. El diseño v1 "blanco vibrante" (purple/orange/cyan/pink, gradientes, tilt 3D, magnetic buttons) queda descartado.
+
+Variables CSS en `:root` (`assets/css/main.css`):
+- Papel: `--paper` (#F7F5EF), `--paper-2`, `--surface`
+- Tinta: `--ink` (#1C1A16), `--ink-2`, `--ink-3`
+- Hairlines: `--line`, `--line-2` — bordes de 1px sustituyen a casi todas las sombras
+- Acentos: `--granada` (#A5402D, rojo granada), `--granada-deep`, `--granada-soft`, `--olive`, `--gold`
+- Tipografía: `--serif` (Fraunces variable, optical sizing, itálicas) para titulares, números y precios; `--sans` (Inter) para UI y cuerpo
+- Easing editorial: `--ease` cubic-bezier(0.22, 1, 0.36, 1)
+
+Principios: whitespace generoso, radios mínimos (2–4px), itálicas granate como acento (`<em>` dentro de titulares), etiquetas small-caps con letter-spacing ancho, reglas horizontales (`.eyebrow-rule`) que se dibujan al hacer scroll, marca de agua tipográfica ("Granada" en el hero, wordmark gigante en el footer) con `-webkit-text-stroke`.
 
 ### Animaciones JS (`main.js`)
 
 | Feature | Descripción |
 |---------|-------------|
-| Scroll progress bar | Barra de progreso en el top, actualizada en scroll |
-| Nav glassmorphism | Blur + border aparece al pasar 50px de scroll |
-| Mobile nav | Hamburger con animación de líneas, overlay con `body.overflow:hidden` |
-| Magnetic buttons | `[data-magnetic]` — el botón se mueve hacia el cursor (strength 0.38) |
-| 3D tilt cards | `[data-tilt]` — rotateX/Y según posición del cursor, max 9° |
+| Hero line reveal | Titular por líneas enmascaradas (`.line-mask` + `body.is-ready`), stagger de 120ms |
+| Scroll progress bar | Barra granate de 2px en el top |
+| Nav | Blur + hairline al pasar 50px de scroll; hamburger mobile con overlay |
 | Counter animation | `[data-count]` — easeOut cubic desde 0 al valor target, 1600ms |
 | Split text reveal | `[data-split]` — divide por palabras en `<span>`, stagger reveal |
-| Intersection Observer | `.reveal` — fadeInUp al entrar en viewport |
-| Hero word cycle | Ciclo de palabras con transición enter/leave en el h1 del hero |
-| Blob parallax | Los blobs del hero se mueven suavemente siguiendo el ratón |
-| Hero cards parallax | Las tarjetas flotantes del hero responden al movimiento del ratón |
+| Intersection Observer | `.reveal` — fade + translate al entrar en viewport |
+| Hero word cycle | Palabra itálica granate rotando en el h1 (local → auténtico → granadino…) |
+| Plates parallax | Las láminas del hero se separan sutilmente al hacer scroll según `data-depth` |
+| Reduced motion | `prefers-reduced-motion` desactiva animaciones (JS y CSS) y muestra el estado final |
+
+Eliminados respecto a v1: custom cursor, magnetic buttons, 3D tilt cards y blob mouse parallax — no encajan en la estética editorial.
 
 ### Overrides del plugin DSB
 
-El tema incluye en `main.css` una sección `/* DSB PLUGIN OVERRIDES */` que adapta los estilos del plugin al design system del tema (colores, border-radius, sombras). Esto permite que el plugin funcione con cualquier tema sin estilos rotos, y que el tema propio se vea perfecto.
+El tema incluye en `main.css` una sección `/* OVERRIDES PLUGIN DSB */` que adapta los estilos del plugin al design system del tema (paleta papel/tinta, hairlines, radios mínimos, serif en titulares). Además `public.css` del plugin usa la misma paleta editorial en sus propias variables, de modo que las vistas del plugin se ven coherentes incluso con otro tema activo.
 
 ### Templates
 
@@ -499,7 +505,7 @@ El tema incluye en `main.css` una sección `/* DSB PLUGIN OVERRIDES */` que adap
 | `page.php` | `/marketplace/`, `/mi-tienda/`, etc. | Páginas con shortcodes del plugin |
 | `index.php` | Blog fallback | Solo posts del blog |
 | `header.php` | — | Nav fixed con scroll effect |
-| `footer.php` | — | Footer dark con links |
+| `footer.php` | — | Footer tinta con wordmark gigante |
 
 ---
 

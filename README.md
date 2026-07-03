@@ -28,7 +28,7 @@ No usa Dokan, WC Vendors ni ningún plugin de marketplace de terceros — toda l
 | Frontend | Vanilla JS + jQuery (admin-ajax), sin build step / sin npm |
 | IA | Google Gemini (`gemini-2.5-flash-lite`) para el chatbot del marketplace |
 | Plugin | `dsb-marketplace` — namespace `DSB\Marketplace`, autoloader por mapa explícito |
-| Tema | `marketraw` — diseño propio (blanco vibrante, purple/orange/cyan/pink), animaciones JS reales |
+| Tema | `marketraw` — diseño editorial propio (papel/tinta/granate, serif Fraunces), animaciones JS sutiles con `prefers-reduced-motion` |
 
 Sin dependencias de build (Webpack/Vite/npm): todo el JS/CSS del plugin y del tema es código plano servido directamente por WordPress.
 
