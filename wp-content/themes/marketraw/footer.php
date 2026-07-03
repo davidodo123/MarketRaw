@@ -40,6 +40,7 @@
 			<span>Hecho con ♥ en Granada</span>
 		</div>
 	</div>
+	<div class="footer__wordmark" aria-hidden="true">MarketRaw</div>
 </footer>
 
 <?php wp_footer(); ?>

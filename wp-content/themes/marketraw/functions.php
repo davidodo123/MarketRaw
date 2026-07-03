@@ -21,7 +21,7 @@ function marketraw_enqueue(): void {
 
     wp_enqueue_style(
         'marketraw-fonts',
-        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap',
+        'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Inter:wght@400;500;600;700&display=swap',
         [],
         null
     );

@@ -30,7 +30,7 @@
 			<?php else : ?>
 				<a href="<?php echo esc_url( add_query_arg( 'redirect_to', get_permalink(), home_url( '/cuenta/' ) ) ); ?>">Entrar</a>
 			<?php endif; ?>
-			<a href="<?php echo esc_url( home_url( '/crear-mi-tienda/' ) ); ?>" class="nav-cta" data-magnetic>Crear tienda</a>
+			<a href="<?php echo esc_url( home_url( '/crear-mi-tienda/' ) ); ?>" class="nav-cta">Crear tienda</a>
 		</nav>
 
 		<button class="nav-toggle" id="nav-toggle"
